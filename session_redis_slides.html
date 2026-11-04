@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ứng Dụng Redis Trong Microservices & So Sánh Message Broker</title>
+  <style>
+    :root {
+      --bg-page: #f1f5f9;
+      --bg-slide: #ffffff;
+      --bg-subtle: #f8fafc;
+      --text-main: #0f172a;
+      --text-secondary: #475569;
+      --redis-red: #dc2626;
+      --redis-light: #fee2e2;
+      --spring-green: #16a34a;
+      --spring-light: #dcfce7;
+      --blue: #0284c7;
+      --blue-light: #e0f2fe;
+      --amber: #d97706;
+      --amber-light: #fef3c7;
+      --purple: #7c3aed;
+      --purple-light: #f3e8ff;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 16px 20px 24px;
+      overflow-x: hidden;
+    }
+    .slide-frame {
+      width: 100%;
+      max-width: 1220px;
+      min-height: 640px;
+      background: var(--bg-slide);
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+      border: 1px solid var(--border);
+      padding: 24px 32px 28px;
+      display: none;
+      flex-direction: column;
+      animation: fadeIn 0.18s ease-out;
+    }
+    .slide-frame.active {
+      display: flex;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(3px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .slide-header {
+      border-bottom: 2px solid var(--bg-page);
+      padding-bottom: 10px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .badge-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .badge-level {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+    .badge-basic { background: #dbeafe; color: #1d4ed8; }
+    .badge-adv { background: #fae8ff; color: #86198f; }
+    .badge-compare { background: #fef3c7; color: #b45309; }
+
+    .lesson-tag {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      background: var(--redis-light);
+      color: var(--redis-red);
+    }
+    .slide-title {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-top: 4px;
+    }
+    .slide-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      justify-content: flex-start;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+    .card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    pre {
+      background: #ffffff;
+      border: 1px solid var(--border-strong);
+      border-left: 4px solid var(--redis-red);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      font-size: 0.81rem;
+      line-height: 1.45;
+      color: #1e293b;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+    }
+    .kw { color: #0284c7; font-weight: 600; }
+    .an { color: #16a34a; font-weight: 600; }
+    .str { color: #b45309; }
+    .cmt { color: #64748b; font-style: italic; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
+    tr:last-child td { border-bottom: none; }
+    th {
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      font-weight: 700;
+    }
+    /* Sửa khung sơ đồ diagram: Chiều cao cố định chuẩn mực, tỉ lệ không bị méo */
+    .diagram-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 140px;
+      overflow: hidden;
+    }
+    svg {
+      width: 100%;
+      height: 100%;
+      max-height: 120px;
+    }
+    .controls {
+      width: 100%;
+      max-width: 1220px;
+      margin-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+    }
+    .btn {
+      background: #ffffff;
+      color: var(--text-main);
+      border: 1px solid var(--border-strong);
+      padding: 6px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:hover {
+      border-color: var(--redis-red);
+      color: var(--redis-red);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ================= SLIDE 1: LESSON 1 - TỔNG QUAN REDIS ================= -->
+  <section class="slide-frame active">
+    <div class="slide-header">
+      <div>
+        <div class="badge-group">
+          <span class="badge-level badge-basic">CƠ BẢN</span>
+          <span class="lesson-tag">Lesson 1 • Giới thiệu Redis và use case</span>
+        </div>
+        <div class="slide-title">1. Giới Thiệu Redis & Kiến Trúc In-Memory Data Store</div>
+      </div>
+    </div>
+    <div class="slide-body">
+      <div class="diagram-card">
+        <svg viewBox="0 0 960 110" xmlns="http://www.w3.org/2000/svg">
+          <rect x="30" y="15" width="200" height="80" rx="8" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+          <text x="130" y="50" text-anchor="middle" font-weight="bold" font-size="14" fill="#0369a1">Microservices</text>
+          <text x="130" y="72" text-anchor="middle" font-size="11" fill="#0284c7">Spring Boot Apps</text>
+
+          <line x1="230" y1="45" x2="350" y2="45" stroke="#dc2626" stroke-width="2.5"/>
+          <text x="290" y="36" text-anchor="middle" font-size="10" font-weight="bold" fill="#dc2626">&lt; 1 ms (RAM)</text>
+
+          <rect x="350" y="10" width="260" height="90" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+          <text x="480" y="40" text-anchor="middle" font-weight="bold" font-size="14" fill="#991b1b">⚡ Redis (In-Memory)</text>
+          <text x="480" y="62" text-anchor="middle" font-size="11" fill="#b91c1c">Single-Threaded Event Loop</text>
+          <text x="480" y="80" text-anchor="middle" font-size="10" fill="#7f1d1d">100.000+ OPS / giây</text>
+
+          <line x1="230" y1="75" x2="680" y2="75" stroke="#64748b" stroke-width="2" stroke-dasharray="4"/>
+          <text x="290" y="92" text-anchor="middle" font-size="10" fill="#64748b">10 - 50 ms (Disk)</text>
+
+          <rect x="680" y="15" width="250" height="80" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+          <text x="805" y="50" text-anchor="middle" font-weight="bold" font-size="14" fill="#334155">RDBMS Database</text>
+          <text x="805" y="72" text-anchor="middle" font-size="11" fill="#64748b">PostgreSQL / MySQL (Đĩa cứng)</text>
+        </svg>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📌 Bản Chất Của Redis</div>
+          <p style="font-size:0.86rem; line-height:1.5; color:#334155;">
+            Redis (<strong>REmote DIctionary Server</strong>) là hệ quản trị cơ sở dữ liệu NoSQL lưu trữ trực tiếp trên bộ nhớ RAM (In-Memory Key-Value Data Store), cung cấp tốc độ đọc ghi tính bằng micro-giây.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">🚀 4 Use Case Kinh Điển Trong Microservices</div>
+          <table>
+            <tr><td><strong>1. Database Caching</strong></td><td>Lưu bản sao kết quả truy vấn để giảm tải cho DB chính</td></tr>
+            <tr><td><strong>2. Distributed Session</strong></td><td>Quản lý phiên đăng nhập dùng chung cho nhiều instances</td></tr>
+            <tr><td><strong>3. Fast Pub/Sub</strong></td><td>Truyền tin nhắn thời gian thực (Chat, Notification tức thì)</td></tr>
+            <tr><td><strong>4. Distributed Lock</strong></td><td>Khóa phân tán ngăn tranh chấp tài nguyên (trừ tồn kho, flash sale)</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 2: LESSON 1 - CÁC CẤU TRÚC DỮ LIỆU CỐT LÕI ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <div>
+        <div class="badge-group">
+          <span class="badge-level badge-basic">CƠ BẢN</span>
+          <span class="lesson-tag">Lesson 1 • Giới thiệu Redis và use case</span>
+        </div>
+        <div class="slide-title">2. Các Cấu Trúc Dữ Liệu Cốt Lõi Của Redis</div>
+      </div>
+    </div>
+    <div class="slide-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">1. Data Types Phổ Biến & Lệnh CLI</div>
+          <table>
+            <thead>
+              <tr><th>Kiểu dữ liệu</th><th>Lệnh cơ bản</th><th>Ví dụ thực tế</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>String</strong></td>
+                <td><code>SET</code>, <code>GET</code>, <code>INCR</code></td>
+                <td>Cache chuỗi JSON, bộ đếm View, Token JWT</td>
+              </tr>
+              <tr>
+                <td><strong>Hash</strong></td>
+                <td><code>HSET</code>, <code>HGET</code></td>
+                <td>Lưu thông tin User/Product dạng Object thu nhỏ</td>
+              </tr>
+              <tr>
+                <td><strong>List</strong></td>
+                <td><code>LPUSH</code>, <code>RPOP</code></td>
+                <td>Hàng đợi việc đơn giản (Queue), Lịch sử hành động</td>
+              </tr>
+              <tr>
+                <td><strong>Set</strong></td>
+                <td><code>SADD</code>, <code>SMEMBERS</code></td>
+                <td>Tập hợp Unique: Lọc trùng IP, Tag bài viết, Bạn chung</td>
+              </tr>
+              <tr>
+                <td><strong>Sorted Set (ZSet)</strong></td>
+                <td><code>ZADD</code>, <code>ZRANGE</code></td>
+                <td>Bảng xếp hạng (Leaderboard) theo điểm số score</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-title">2. Cơ Chế Hết Hạn Dữ Liệu (TTL & Eviction)</div>
+          <pre><code><span class="cmt"># Đặt key kèm thời gian sống (TTL = 60 giây)</span>
+SET user:token:123 "valid" EX 60
+
+<span class="cmt"># Kiểm tra thời gian còn lại (giây)</span>
+TTL user:token:123</code></pre>
+          <div style="margin-top:10px;">
+            <p style="font-size:0.84rem; line-height:1.45; color:#334155;">
+              • <strong>TTL (Time-To-Live):</strong> Tự động dọn dẹp bộ nhớ khi dữ liệu hết hạn.<br/>
+              • <strong>MaxMemory Policy:</strong> Khi RAM đầy, Redis áp dụng chính sách <code>allkeys-lru</code> (loại bỏ key ít truy cập nhất gần đây) để nhường chỗ cho dữ liệu mới.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 3: LESSON 2 - REDIS CACHE PATTERNS ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <div>
+        <div class="badge-group">
+          <span class="badge-level badge-basic">CƠ BẢN</span>
+          <span class="lesson-tag">Lesson 2 • Redis Cache – tăng tốc độ truy vấn</span>
+        </div>
+        <div class="slide-title">3. Cơ Chế Cache-Aside (Look-Aside) & Cache Hit / Miss</div>
+      </div>
+    </div>
+    <div class="slide-body">
+      <div class="diagram-card">
+        <svg viewBox="0 0 960 110" xmlns="http://www.w3.org/2000/svg">
+          <rect x="30" y="20" width="160" height="70" rx="8" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+          <text x="110" y="50" text-anchor="middle" font-weight="bold" font-size="13" fill="#0369a1">Client Request</text>
+          <text x="110" y="70" text-anchor="middle" font-size="11" fill="#0284c7">GET /products/10</text>
+
+          <line x1="190" y1="45" x2="330" y2="45" stroke="#16a34a" stroke-width="2"/>
+          <text x="260" y="35" text-anchor="middle" font-size="10" font-weight="bold" fill="#16a34a">1. Tìm Cache</text>
+
+          <rect x="330" y="10" width="280" height="90" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+          <text x="470" y="40" text-anchor="middle" font-weight="bold" font-size="14" fill="#991b1b">Redis Cache</text>
+          <text x="470" y="62" text-anchor="middle" font-size="11" font-weight="bold" fill="#16a34a">🟢 HIT: Có ➔ Trả ngay (1ms)</text>
+          <text x="470" y="82" text-anchor="middle" font-size="11" font-weight="bold" fill="#dc2626">🔴 MISS: Chưa có ➔ Xuống DB</text>
+
+          <line x1="610" y1="45" x2="740" y2="45" stroke="#dc2626" stroke-width="2"/>
+          <text x="675" y="35" text-anchor="middle" font-size="10" font-weight="bold" fill="#dc2626">2. Truy vấn DB</text>
+
+          <rect x="740" y="20" width="190" height="70" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+          <text x="835" y="50" text-anchor="middle" font-weight="bold" font-size="13" fill="#334155">RDBMS Database</text>
+          <text x="835" y="70" text-anchor="middle" font-size="10" fill="#64748b">3. Trả data & Ghi Cache</text>
+        </svg>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Mô Hình Cache-Aside Hoạt Động Ra Sao?</div>
+          <ol style="font-size:0.86rem; line-height:1.5; padding-left:18px; color:#334155;">
+            <li>Ứng dụng kiểm tra dữ liệu trong Redis với key tương ứng.</li>
+            <li>Nếu có (<strong>Cache Hit</strong>): Trả về ngay lập tức, bỏ qua Database.</li>
+            <li>Nếu chưa có (<strong>Cache Miss</strong>): Đọc từ Database chính ➔ Lưu kết quả vào Redis kèm TTL ➔ Trả về cho Client.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <div class="card-title">Chiến Lược Cập Nhật Cache Khi Dữ Liệu Thay Đổi</div>
+          <table>
+            <tr><td><strong>Write-Through</strong></td><td>Ghi đồng thời vào cả Cache và Database</td></tr>
+            <tr><td><strong>Cache Invalidation</strong></td><td>Khi DB cập nhật/xóa ➔ Xóa key tương ứng trong Redis (Khuyên dùng)</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 4: LESSON 2 - SPRING CACHE ANNOTATIONS ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <div>
+        <div class="badge-group">
+          <span class="badge-level badge-basic">CƠ BẢN</span>
+          <span class="lesson-tag">Lesson 2 • Redis Cache – tăng tốc độ truy vấn</span>
+        </div>
+        <div class="slide-title">4. Cài Đặt Spring Cache Với Redis Annotations</div>
+      </div>
+    </div>
+    <div class="slide-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">1. Dependency & Cấu hình <code>application.yml</code></div>
+          <pre><code><span class="cmt">&lt;!-- pom.xml --&gt;</span>
+&lt;<span class="kw">dependency</span>&gt;
+    &lt;<span class="kw">groupId</span>&gt;org.springframework.boot&lt;/<span class="kw">groupId</span>&gt;
+    &lt;<span class="kw">artifactId</span>&gt;spring-boot-starter-data-redis&lt;/<span class="kw">artifactId</span>&gt;
+&lt;/<span class="kw">dependency</span>&gt;
+
+<span class="cmt"># application.yml</span>
+<span class="kw">spring:</span>
+  <span class="kw">cache:</span>
+    <span class="kw">type:</span> redis
+  <span class="kw">data:</span>
+    <span class="kw">redis:</span>
+      <span class="kw">host:</span> localhost
+      <span class="kw">port:</span> 6379</code></pre>
+        </div>
+        <div class="card">
+          <div class="card-title">2. Sử Dụng Các Annotation Tiêu Chuẩn</div>
+          <pre><code><span class="an">@Service</span>
+<span class="kw">public class</span> ProductService {
+
+    <span class="cmt">// Tìm thấy trong cache thì trả về ngay, chưa có mới chạy hàm</span>
+    <span class="an">@Cacheable</span>(value = <span class="str">"products"</span>, key = <span class="str">"#id"</span>)
+    <span class="kw">public</span> Product getProductById(Long id) {
+        <span class="kw">return</span> productRepo.findById(id).orElseThrow();
+    }
+
+    <span class="cmt">// Khi update sản phẩm thì xóa cache cũ để tránh dữ liệu rác</span>
+    <span class="an">@CacheEvict</span>(value = <span class="str">"products"</span>, key = <span class="str">"#product.id"</span>)
+    <span class="kw">public</span> Product updateProduct(Product product) {
+        <span class="kw">return</span> productRepo.save(product);
+    }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 5: LESSON 3 - REDIS PUB/SUB CƠ CHẾ ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <div>
+        <div class="badge-group">
+          <span class="badge-level badge-basic">CƠ BẢN</span>
+          <span class="lesson-tag">Lesson 3 • Redis Pub/Sub – giao tiếp giữa service</span>
+        </div>
+        <div class="slide-title">5. Cơ Chế Giao Tiếp Thời Gian Thực Với Redis Pub/Sub</div>
+      </div>
+    </div>
+    <div class="slide-body">
+      <div class="diagram-card">
+        <svg viewBox="0 0 960 110" xmlns="http://www.w3.org/2000/svg">
+          <rect x="30" y="20" width="170" height="70" rx="8" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+          <text x="115" y="48" text-anchor="middle" font-weight="bold" font-size="13" fill="#0369a1">Publisher</text>
+          <text x="115" y="68" text-anchor="middle" font-size="11" fill="#0284c7">Order Service</text>
+
+          <line x1="200" y1="55" x2="310" y2="55" stroke="#dc2626" stroke-width="2.5"/>
+          <text x="255" y="45" text-anchor="middle" font-size="10" font-weight="bold" fill="#dc2626">PUBLISH</text>
+
+          <rect x="310" y="10" width="310" height="90" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+          <text x="465" y="38" text-anchor="middle" font-weight="bold" font-size="13" fill="#991b1b">Redis Channel: "order-channel"</text>
+          <text x="465" y="60" text-anchor="middle" font-size="11" fill="#b91c1c">Fire-and-Forget (Bắn là xong)</text>
+          <text x="465" y="78" text-anchor="middle" font-size="10" fill="#7f1d1d">Không lưu trữ tin nhắn cũ!</text>
+
+          <line x1="620" y1="40" x2="720" y2="30" stroke="#16a34a" stroke-width="2"/>
+          <rect x="720" y="10" width="210" height="40" rx="6" fill="#ffffff" stroke="#16a34a"/><text x="825" y="35" text-anchor="middle" font-size="11" font-weight="bold">Subscriber 1: Notification</text>
+
+          <line x1="620" y1="70" x2="720" y2="80" stroke="#16a34a" stroke-width="2"/>
+          <rect x="720" y="60" width="210" height="40" rx="6" fill="#ffffff" stroke="#16a34a"/><text x="825" y="85" text-anchor="middle" font-size="11" font-weight="bold">Subscriber 2: Analytics</text>
+        </svg>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Đặc Tính Cốt Lõi Của Redis Pub/Sub</div>
+          <p style="font-size:0.86rem; line-height:1.5; color:#334155;">
+            • <strong>Cơ chế Fire-and-Forget:</strong> Publisher gửi tin lên Channel, Redis phát ngay lập tức tới tất cả Subscriber đang online.<br/>
+            • <strong>Không Lưu Trữ (No Persistence):</strong> Nếu Subscriber đang offline lúc gửi, tin nhắn đó sẽ <strong>bị mất vĩnh viễn</strong> và không nhận lại được.<br/>
+            • <strong>Tốc độ cực nhanh:</strong> Độ trễ cực thấp tính bằng phần nghìn giây.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">Khi Nào Nên Dùng Redis Pub/Sub?</div>
+          <table>
+            <tr><td><strong>Phù hợp</strong></td><td>Chat trực tiếp, thông báo tức thời WebSockets, thông báo refresh cache hệ thống</td></tr>
+            <tr><td><strong>Không phù hợp</strong></td><td>Giao dịch tài chính, thanh toán, đặt đơn hàng (vì không đảm bảo lưu trữ nếu lỗi)</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 6: LESSON 3 - CODE REDIS PUB/SUB TRONG SPRING ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <div>
+        <div class="badge-group">
+          <span class="badge-level badge-basic">CƠ BẢN</span>
+          <span class="lesson-tag">Lesson 3 • Redis Pub/Sub – giao tiếp giữa service</span>
+        </div>
+        <div class="slide-title">6. Cài Đặt Redis Pub/Sub Với RedisTemplate & MessageListener</div>
+      </div>
+    </div>
+    <div class="slide-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">1. Code Publisher (Phát Tin Nhắn)</div>
+          <pre><code><span class="an">@Service</span>
+<span class="kw">public class</span> NotificationPublisher {
+
+    <span class="an">@Autowired</span>
+    <span class="kw">private</span> StringRedisTemplate redisTemplate;
+
+    <span class="kw">public void</span> publishMessage(String channel, String msg) {
+        <span class="cmt">// Gửi message vào channel chỉ định</span>
+        redisTemplate.convertAndSend(channel, msg);
+        System.out.println(<span class="str">"Đã phát tin lên: "</span> + channel);
+    }
+}</code></pre>
+        </div>
+        <div class="card">
+          <div class="card-title">2. Code Subscriber (Lắng Nghe Tin Nhắn)</div>
+          <pre><code><span class="an">@Component</span>
+<span class="kw">public class</span> RedisMessageSubscriber <span class="kw">implements</span> MessageListener {
+
+    <span class="an">@Override</span>
+    <span class="kw">public void</span> onMessage(Message message, <span class="kw">byte</span>[] pattern) {
+        String body = <span class="kw">new</span> String(message.getBody());
+        String channel = <span class="kw">new</span> String(message.getChannel());
+        System.out.println(<span class="str">"Nhận từ ["</span> + channel + <span class="str">"]: "</span> + body);
+    }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 7: LESSON 4 - DISTRIBUTED LOCK BÀI TOÁN (ĐÃ SỬA CỠ ẢNH CHUẨN) ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <div>
+        <div class="badge-group">
+          <span class="badge-level badge-adv">NÂNG CAO</span>
+          <span class="lesson-tag">Lesson 4 • Redis cho distributed lock</span>
+        </div>
+        <div class="slide-title">7. Bài Toán Khóa Phân Tán (Distributed Lock) Trong Microservices</div>
+      </div>
+    </div>
+    <div class="slide-body">
+      <!-- Sơ đồ đã được tối ưu viewBox và kích thước tuyệt đối không bao giờ bị cắt viền -->
+      <div class="diagram-card">
+        <svg viewBox="0 0 960 110" xmlns="http://www.w3.org/2000/svg">
+          <!-- Service #1 -->
+          <rect x="25" y="15" width="230" height="80" rx="8" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+          <text x="140" y="48" text-anchor="middle" font-weight="bold" font-size="14" fill="#0369a1">Order Service #1</text>
+          <text x="140" y="70" text-anchor="middle" font-size="12" fill="#0284c7">User A mua sp 101</text>
+
+          <!-- Line 1 to Lock -->
+          <line x1="255" y1="55" x2="355" y2="55" stroke="#dc2626" stroke-width="2.5"/>
+
+          <!-- Redis Lock Box -->
+          <rect x="355" y="10" width="250" height="90" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+          <text x="480" y="38" text-anchor="middle" font-weight="bold" font-size="14" fill="#991b1b">🔒 Redis Distributed Lock</text>
+          <text x="480" y="58" text-anchor="middle" font-size="11" fill="#b91c1c">Key: "lock:product:101"</text>
+          <text x="480" y="76" text-anchor="middle" font-size="12" font-weight="bold" fill="#15803d">Chỉ 1 service lấy được khóa!</text>
+          <text x="480" y="92" text-anchor="middle" font-size="10" fill="#7f1d1d">Tồn kho còn 1 ➔ Không bị bán âm</text>
+
+          <!-- Line 2 to Lock -->
+          <line x1="705" y1="55" x2="605" y2="55" stroke="#dc2626" stroke-width="2.5"/>
+
+          <!-- Service #2 -->
+          <rect x="705" y="15" width="230" height="80" rx="8" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+          <text x="820" y="48" text-anchor="middle" font-weight="bold" font-size="14" fill="#0369a1">Order Service #2</text>
+          <text x="820" y="70" text-anchor="middle" font-size="12" fill="#0284c7">User B mua sp 101</text>
+        </svg>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Vì Sao <code>synchronized</code> Java Bị Vô Hiệu Hóa?</div>
+          <p style="font-size:0.86rem; line-height:1.5; color:#334155;">
+            Khóa của Java (<code>synchronized</code>, <code>ReentrantLock</code>) chỉ có tác dụng trong <strong>cùng 1 máy ảo JVM</strong>. Khi hệ thống mở rộng chạy nhiều container Docker độc lập, hai user truy cập đồng thời vào hai container khác nhau sẽ gây ra hiện tượng <strong>Race Condition</strong> (Bán âm kho, trừ tiền 2 lần).
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">Nguyên Lý Của Redis Distributed Lock</div>
+          <p style="font-size:0.86rem; line-height:1.5; color:#334155;">
+            Lợi dụng tính chất <strong>Single-Threaded</strong> của Redis với lệnh nguyên tử (Atomic):<br/>
+            <code>SET lock_key unique_value NX PX 30000</code><br/>
+            • <code>NX</code>: Chỉ tạo nếu key CHƯA tồn tại (Lấy khóa thành công).<br/>
+            • <code>PX 30000</code>: Hết hạn sau 30 giây để chống Deadlock nếu service bị chết.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 8: LESSON 4 - TRIỂN KHAI VỚI REDISSON ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <div>
+        <div class="badge-group">
+          <span class="badge-level badge-adv">NÂNG CAO</span>
+          <span class="lesson-tag">Lesson 4 • Redis cho distributed lock</span>
+        </div>
+        <div class="slide-title">8. Triển Khai Distributed Lock Chuẩn Production Với Redisson</div>
+      </div>
+    </div>
+    <div class="slide-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">1. Code Sử Dụng Redisson Lock</div>
+          <pre><code><span class="an">@Service</span>
+<span class="kw">public class</span> OrderService {
+
+    <span class="an">@Autowired</span>
+    <span class="kw">private</span> RedissonClient redisson;
+
+    <span class="kw">public void</span> buyProduct(Long productId) {
+        RLock lock = redisson.getLock(<span class="str">"lock:product:"</span> + productId);
+        <span class="kw">try</span> {
+            <span class="cmt">// Chờ tối đa 5s để lấy khóa, tự nhả sau 10s</span>
+            <span class="kw">if</span> (lock.tryLock(5, 10, TimeUnit.SECONDS)) {
+                <span class="cmt">// Độc quyền trừ tồn kho an toàn</span>
+                inventoryService.deductStock(productId);
+            }
+        } <span class="kw">finally</span> {
+            <span class="kw">if</span> (lock.isHeldByCurrentThread()) {
+                lock.unlock(); <span class="cmt">// Luôn nhả khóa trong finally</span>
+            }
+        }
+    }
+}</code></pre>
+        </div>
+        <div class="card">
+          <div class="card-title">2. Tính Năng Vượt Trội Của Redisson (Watchdog)</div>
+          <table>
+            <tr><td><strong>Cơ Chế Watchdog</strong></td><td>Tự động gia hạn thời gian khóa (Lock Extension) nếu tác vụ xử lý DB chưa xong, chống bị nhả khóa non</td></tr>
+            <tr><td><strong>Non-blocking</strong></td><td>Hỗ trợ <code>tryLock()</code> chờ đợi thông minh thay vì tạo vòng lặp vô tận (spin lock) gây nghẽn CPU</td></tr>
+            <tr><td><strong>Giải Thuật Redlock</strong></td><td>Hỗ trợ khóa đồng thuận trên cụm Multi-node Redis Cluster độ tin cậy cao</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 9: SO SÁNH RABBITMQ, KAFKA VÀ REDIS ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <div>
+        <div class="badge-group">
+          <span class="badge-level badge-compare">SO SÁNH CỐT LÕI</span>
+          <span class="lesson-tag">Kiến trúc giao tiếp Microservices</span>
+        </div>
+        <div class="slide-title">9. Bảng So Sánh Toàn Diện: RabbitMQ vs Apache Kafka vs Redis</div>
+      </div>
+    </div>
+    <div class="slide-body">
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Tiêu chí so sánh</th>
+              <th>🐰 RabbitMQ</th>
+              <th>🚀 Apache Kafka</th>
+              <th>⚡ Redis (Pub/Sub & Streams)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Bản chất cốt lõi</strong></td>
+              <td>Traditional Message Broker (AMQP)</td>
+              <td>Distributed Streaming Commit-Log</td>
+              <td>In-Memory Cache & Lightweight Pub/Sub</td>
+            </tr>
+            <tr>
+              <td><strong>Cơ chế lưu trữ</strong></td>
+              <td>Lưu tạm, <strong>xóa ngay sau khi Consumer Ack</strong></td>
+              <td><strong>Lưu vĩnh viễn / lâu dài</strong> trên ổ đĩa theo thời gian</td>
+              <td>Lưu trên RAM (Pub/Sub không lưu; Streams lưu có giới hạn)</td>
+            </tr>
+            <tr>
+              <td><strong>Khả năng đọc lại (Replay)</strong></td>
+              <td>❌ Không thể đọc lại tin đã xóa</td>
+              <td>✅ <strong>Đọc lại thoải mái</strong> bằng cách chỉnh Offset</td>
+              <td>❌ Pub/Sub không hỗ trợ (Streams có hỗ trợ đọc lại)</td>
+            </tr>
+            <tr>
+              <td><strong>Định tuyến tin nhắn (Routing)</strong></td>
+              <td><strong>Rất linh hoạt</strong> (Direct, Topic, Fanout, Headers)</td>
+              <td>Đơn giản (Dựa theo Topic và Partition Key)</td>
+              <td>Cơ bản theo Channel Pattern (vd: <code>order.*</code>)</td>
+            </tr>
+            <tr>
+              <td><strong>Thông lượng (Throughput)</strong></td>
+              <td>Khá (20k - 50k msgs/giây)</td>
+              <td><strong>Cực khủng (Hàng triệu msgs/giây)</strong></td>
+              <td>Rất cao (100k+ msgs/giây trên RAM)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Mô Hình Xử Lý Message</div>
+          <p style="font-size:0.84rem; line-height:1.45; color:#334155;">
+            • <strong>RabbitMQ (Smart Broker, Dumb Consumer):</strong> Broker tự theo dõi trạng thái từng tin nhắn, điều phối gửi cho ai.<br/>
+            • <strong>Kafka (Dumb Broker, Smart Consumer):</strong> Broker chỉ lưu log, Consumer tự lưu giữ vị trí Offset mình đang đọc tới đâu.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">Độ Trễ Phản Hồi (Latency)</div>
+          <p style="font-size:0.84rem; line-height:1.45; color:#334155;">
+            • <strong>Redis:</strong> Nhanh nhất (&lt; 1 ms) do hoàn toàn trên RAM.<br/>
+            • <strong>RabbitMQ:</strong> Vài mili-giây.<br/>
+            • <strong>Kafka:</strong> Tối ưu cho thông lượng theo lô (Batching), độ trễ 2 - 10 ms.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SLIDE 10: KHI NÀO CHỌN GÌ? ================= -->
+  <section class="slide-frame">
+    <div class="slide-header">
+      <div>
+        <div class="badge-group">
+          <span class="badge-level badge-compare">SO SÁNH CỐT LÕI</span>
+          <span class="lesson-tag">Kiến trúc giao tiếp Microservices</span>
+        </div>
+        <div class="slide-title">10. Cẩm Nang Lựa Chọn Công Cụ Cho Dự Án Thực Tế</div>
+      </div>
+    </div>
+    <div class="slide-body">
+      <div class="grid-3">
+        <div class="card" style="border-top: 4px solid var(--amber);">
+          <div class="card-title">🐰 Khi nào chọn RabbitMQ?</div>
+          <ul style="font-size:0.83rem; line-height:1.5; padding-left:16px; color:#334155;">
+            <li>Cần giao tiếp dạng <strong>Task Queue phức tạp</strong> (Background Job, xử lý ảnh, xuất file PDF).</li>
+            <li>Cần <strong>định tuyến tin nhắn nâng cao</strong> (Routing Rules phức tạp cho từng phòng ban).</li>
+            <li>Xử lý theo kiểu Transaction: Tin nào xong tin đó, có Retry/Dead Letter linh hoạt từng message.</li>
+          </ul>
+        </div>
+
+        <div class="card" style="border-top: 4px solid var(--blue);">
+          <div class="card-title">🚀 Khi nào chọn Kafka?</div>
+          <ul style="font-size:0.83rem; line-height:1.5; padding-left:16px; color:#334155;">
+            <li>Kiến trúc <strong>Event-Driven Microservices quy mô lớn</strong> (Đơn hàng, Thanh toán, Tồn kho).</li>
+            <li>Cần <strong>đọc lại dữ liệu lịch sử</strong> (Replay events) khi có service mới khởi tạo.</li>
+            <li>Thu thập log tập trung, phân tích dữ liệu lớn thời gian thực (Big Data / Stream Processing).</li>
+          </ul>
+        </div>
+
+        <div class="card" style="border-top: 4px solid var(--redis-red);">
+          <div class="card-title">⚡ Khi nào chọn Redis?</div>
+          <ul style="font-size:0.83rem; line-height:1.5; padding-left:16px; color:#334155;">
+            <li>Cần <strong>tốc độ siêu nhanh & độ trễ cực thấp</strong> mà chấp nhận được mất dữ liệu nếu sự cố.</li>
+            <li>Tính năng thời gian thực đơn giản: Thông báo đẩy, WebSocket broadcast, đồng bộ Cache.</li>
+            <li>Hệ thống <strong>quy mô vừa và nhỏ</strong>, muốn tận dụng Redis có sẵn để làm queue/pubsub mà không cần cài thêm Kafka.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💡 Mô Hình Kết Hợp Chuẩn Trong Doanh Nghiệp Lớn</div>
+        <p style="font-size:0.86rem; line-height:1.5; color:#334155;">
+          Trong thực tế, các doanh nghiệp không chọn loại trừ lẫn nhau mà <strong>phối hợp cả 3 công nghệ</strong>:<br/>
+          • Dùng <strong>Redis</strong> để Cache dữ liệu và Khóa phân tán (Distributed Lock) khi trừ kho.<br/>
+          • Dùng <strong>Kafka</strong> làm xương sống truyền sự kiện nghiệp vụ lõi (Event Bus) giữa các Microservices.<br/>
+          • Dùng <strong>RabbitMQ</strong> để quản lý hàng đợi xuất báo cáo, gửi email và tác vụ ngầm.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div>
+      <button class="btn" onclick="prev()">◀ Slide trước (←)</button>
+      <button class="btn" onclick="next()" style="margin-left: 8px;">Slide tiếp (→) ▶</button>
+    </div>
+    <div id="page-indicator" style="font-weight: 700;">Slide 1 / 10</div>
+  </div>
+
+  <script>
+    const slides = document.querySelectorAll('.slide-frame');
+    const indicator = document.getElementById('page-indicator');
+    let current = 0;
+
+    function showSlide(index) {
+      slides.forEach((s, i) => s.classList.toggle('active', i === index));
+      indicator.textContent = `Slide ${index + 1} / ${slides.length}`;
+      window.scrollTo(0, 0);
+    }
+    function next() {
+      if (current < slides.length - 1) { current++; showSlide(current); }
+    }
+    function prev() {
+      if (current > 0) { current--; showSlide(current); }
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+    });
+  </script>
+</body>
+</html>
