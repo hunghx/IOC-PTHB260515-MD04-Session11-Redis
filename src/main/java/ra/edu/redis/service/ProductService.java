@@ -16,4 +16,5 @@ public class ProductService {
         }
         return "Product Details with ID: " + id;
     }
+    // làm sao để cứ sao 10p thì xóa cache đọc lại từ db
 }
